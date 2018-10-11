@@ -19,7 +19,9 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_omp_registration
   roscpp
   sensor_msgs
+		tf
   std_msgs
+		geometry_msgs
   velodyne_pointcloud
 )
 
@@ -72,7 +74,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES fast_ndt_slam
-  CATKIN_DEPENDS nav_msgs ndt_gpu ndt_cpu pcl_conversions pcl_omp_registration roscpp sensor_msgs std_msgs velodyne_pointcloud
+  CATKIN_DEPENDS nav_msgs ndt_gpu ndt_cpu pcl_conversions pcl_omp_registration roscpp tf sensor_msgs std_msgs geometry_msgs velodyne_pointcloud
 )
 
 ###########
@@ -114,7 +116,7 @@ add_executable(${PROJECT_NAME}_node src/fast_ndt_slam_node.cpp ${SRC_LIST})
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(${PROJECT_NAME}_node
-   ${catkin_LIBRARIES} libpcl
+   ${catkin_LIBRARIES}
  )
 
 #############

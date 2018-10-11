@@ -15,6 +15,8 @@
 #include <pcl/registration/ndt.h>
 #include <eigen3/Eigen/Eigen>
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_datatypes.h>
 #ifdef CUDA_FOUND
 #include <ndt_gpu/NormalDistributionsTransform.h>
 #endif
@@ -29,11 +31,36 @@ namespace FAST_NDT {
         double roll;
         double pitch;
         double yaw;
+        void init() {
+            x = y = z = 0;
+            roll = pitch = yaw = 0;
+        }
+        Eigen::Matrix4f rotateRPY() {
+        	Eigen::Translation3f tf_trans(x, y, z);
+        	Eigen::AngleAxisf rot_x(roll, Eigen::Vector3f::UnitX());
+        	Eigen::AngleAxisf rot_y(pitch, Eigen::Vector3f::UnitY());
+        	Eigen::AngleAxisf rot_z(yaw, Eigen::Vector3f::UnitZ());
+        	Eigen::Matrix4f mat = (tf_trans * rot_z * rot_y * rot_x).matrix();
+        	return mat;
+        }
     };
     class LidarMapping {
     public:
-        LidarMapping() {
+        LidarMapping(): globalMapPtr(new pcl::PointCloud<pcl::PointXYZI>()) {
+            maxIter = 30;
+            ndt_res = 1.0;
+            step_size = 0.1;
+            trans_eps = 0.01;
+            voxel_leaf_size = 2.0;
 
+            min_add_scan_shift = 1;
+            min_scan_range = 5.0;
+            max_scan_range = 200.0;
+            map_initialed = false;
+
+            previous_pose.init();
+            guess_pose.init();
+            current_pose.init();
         }
 
         void setup(ros::NodeHandle handle, ros::NodeHandle privateHandle);
@@ -42,9 +69,31 @@ namespace FAST_NDT {
 
     private:
         pcl::PointCloud<pcl::PointXYZI>::Ptr globalMapPtr;
+#ifdef CUDA_FOUND
+        gpu::GNormalDistributionsTransform anh_gpu_ndt;
+#endif
+        pcl::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
         Pose previous_pose;
         Pose guess_pose;
         Pose current_pose;
+        Pose added_pose;
+        int maxIter;
+        float ndt_res;
+        double step_size;
+        double trans_eps;
+        double voxel_leaf_size;
+
+        double min_add_scan_shift;
+        double min_scan_range;
+        double max_scan_range;
+        bool map_initialed;
+
+        // publisher
+        ros::Publisher current_pose_pub;
+        ros::Publisher ndt_map_pub;
+        // subscriber
+        ros::Subscriber points_sub;
+        ros::Subscriber output_sub;
     };
 }
 
