@@ -44,18 +44,31 @@ void LidarMapping::setup(ros::NodeHandle handle, ros::NodeHandle privateHandle) 
 	// output_sub = handle.subscribe("/ndt_mapping_output", 10, &LidarMapping::output_callback, this);
 
 }
+
+void LidarMapping::update_region_map(double max_x, double max_y, double min_x, double min_y) {
+	pcl::ConditionAnd<PointT >::Ptr range_cond(new pcl::ConditionAnd<PointT> ());
+	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::GE, min_x)));
+	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::GE, min_y)));
+	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::LE, max_x)));
+	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::LE, max_y)));
+	pcl::ConditionalRemoval<PointT > cond_rem;
+	cond_rem.setCondition(range_cond);
+	cond_rem.setInputCloud(globalMapPtr);
+	cond_rem.setKeepOrganized(true);
+	cond_rem.filter(* regionMapPtr);
+}
+
 void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &input_cloud) {
-	pcl::PointCloud<pcl::PointXYZI> scan, tmp;
-	pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_scan_ptr(new pcl::PointCloud<pcl::PointXYZI>());
-	pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_scan_ptr(new pcl::PointCloud<pcl::PointXYZI>());
-	pcl::PointXYZI p;
+	pcl::PointCloud<PointT > scan, tmp;
+	pcl::PointCloud<PointT>::Ptr filtered_scan_ptr(new pcl::PointCloud<PointT>());
+	pcl::PointCloud<PointT>::Ptr transformed_scan_ptr(new pcl::PointCloud<PointT>());
+	PointT p;
 	pcl::fromROSMsg(*input_cloud, tmp);
 	// filtered illegal point
-	for (pcl::PointCloud<pcl::PointXYZI>::const_iterator item = tmp.begin(); item != tmp.end(); item ++) {
+	for (pcl::PointCloud<PointT>::const_iterator item = tmp.begin(); item != tmp.end(); item ++) {
 		p.x = (double) item->x;
 		p.y = (double) item->y;
 		p.z = (double) item->z;
-		p.intensity = (double) item->intensity;
 		double r = sqrt(p.x * p.x + p.y * p.y);
 		if (min_scan_range < r && r < max_scan_range) {
 			scan.push_back(p);
@@ -70,9 +83,9 @@ void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &inp
 		return;
 	}
 	// filter
-	pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter;
+	pcl::VoxelGrid<PointT> voxel_grid_filter;
 	voxel_grid_filter.setLeafSize(voxel_leaf_size, voxel_leaf_size, voxel_leaf_size);
-	pcl::PointCloud<pcl::PointXYZI>::Ptr scan_ptr(new pcl::PointCloud<pcl::PointXYZI>(scan));
+	pcl::PointCloud<PointT>::Ptr scan_ptr(new pcl::PointCloud<PointT>(scan));
 	voxel_grid_filter.setInputCloud(scan_ptr);
 	voxel_grid_filter.filter(*filtered_scan_ptr);
 
@@ -92,7 +105,7 @@ void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &inp
 	Eigen::Matrix4f init_guess = guess_pose.rotateRPY();
 
 	double t1 = ros::Time::now().toNSec();
-	pcl::PointCloud<pcl::PointXYZI>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+	pcl::PointCloud<PointT>::Ptr output_cloud(new pcl::PointCloud<PointT>());
 	ndt.align(*output_cloud, init_guess);
 	double fitness_score = ndt.getFitnessScore();
 	Eigen::Matrix4f finalTrans = ndt.getFinalTransformation();

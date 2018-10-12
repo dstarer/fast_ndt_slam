@@ -9,6 +9,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/filter.h>
+#include <pcl/filters/conditional_removal.h>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
 #include <velodyne_pointcloud/point_types.h>
@@ -24,6 +26,8 @@
 #include <time.h>
 
 namespace FAST_NDT {
+		using PointT = pcl::PointXYZ;
+
     struct Pose {
         double x;
         double y;
@@ -46,7 +50,7 @@ namespace FAST_NDT {
     };
     class LidarMapping {
     public:
-        LidarMapping(): globalMapPtr(new pcl::PointCloud<pcl::PointXYZI>()) {
+        LidarMapping(): globalMapPtr(new pcl::PointCloud<PointT>()) {
             maxIter = 30;
             ndt_res = 1.0;
             step_size = 0.1;
@@ -67,12 +71,19 @@ namespace FAST_NDT {
 
         void points_callback(const sensor_msgs::PointCloud2::ConstPtr &input_cloud);
 
+		protected:
+    		/**
+    		 * select region map in [min_x, min_y, max_x, max_y]
+    		 * **/
+    		void update_region_map(double max_x, double max_y, double min_x, double min_y);
+
     private:
-        pcl::PointCloud<pcl::PointXYZI>::Ptr globalMapPtr;
+        pcl::PointCloud<PointT>::Ptr globalMapPtr;
+        pcl::PointCloud<PointT>::Ptr regionMapPtr;
 #ifdef CUDA_FOUND
         gpu::GNormalDistributionsTransform anh_gpu_ndt;
 #endif
-        pcl::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
+        pcl::NormalDistributionsTransform<PointT, PointT> ndt;
         Pose previous_pose;
         Pose guess_pose;
         Pose current_pose;
