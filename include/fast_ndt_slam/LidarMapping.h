@@ -26,7 +26,7 @@
 #include <time.h>
 
 namespace FAST_NDT {
-		using PointT = pcl::PointXYZ;
+	using PointT = pcl::PointXYZ;
 
     struct Pose {
         double x;
@@ -76,7 +76,6 @@ namespace FAST_NDT {
     		 * select region map in [min_x, min_y, max_x, max_y]
     		 * **/
     		void update_region_map(double max_x, double max_y, double min_x, double min_y);
-
     private:
         pcl::PointCloud<PointT>::Ptr globalMapPtr;
         pcl::PointCloud<PointT>::Ptr regionMapPtr;

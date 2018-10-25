@@ -7,7 +7,7 @@ project(fast_ndt_slam)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(PCL REQUIRED)
+find_package(PCL 1.7 REQUIRED)
 find_package(CUDA)
 find_package(Eigen3 QUIET)
 
@@ -61,7 +61,8 @@ find_package(catkin REQUIRED COMPONENTS
 #   cfg/DynReconf1.cfg
 #   cfg/DynReconf2.cfg
 # )
-
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -84,9 +85,11 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
- include/
+  include ${catkin_INCLUDE_DIRS}
+  include/
   ${catkin_INCLUDE_DIRS}
 		${EIGEN3_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -99,7 +102,7 @@ include_directories(
 ## either from message generation or dynamic reconfigure
 
 
-set(SRC_LIST include/fast_ndt_slam/LidarMapping.h src/LidarMapping.cpp)
+set(SRC_LIST include/fast_ndt_slam/LidarMapping.h src/LidarMapping.cpp src/Cluster.cpp src/ClusterDetector.cpp)
 
 ## Declare a C++ executable
 add_executable(${PROJECT_NAME}_node src/fast_ndt_slam_node.cpp ${SRC_LIST})
@@ -117,6 +120,7 @@ add_executable(${PROJECT_NAME}_node src/fast_ndt_slam_node.cpp ${SRC_LIST})
 ## Specify libraries to link a library or executable target against
  target_link_libraries(${PROJECT_NAME}_node
    ${catkin_LIBRARIES}
+		 ${PCL_LIBARRIES}
  )
 
 #############
