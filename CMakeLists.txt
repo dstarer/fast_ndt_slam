@@ -102,7 +102,7 @@ include_directories(
 ## either from message generation or dynamic reconfigure
 
 
-set(SRC_LIST include/fast_ndt_slam/LidarMapping.h src/LidarMapping.cpp src/Cluster.cpp src/ClusterDetector.cpp)
+set(SRC_LIST include/fast_ndt_slam/LidarMapping.h src/LidarMapping.cpp src/Cluster.cpp src/ClusterDetector.cpp src/FastClusterDetector.cpp)
 
 ## Declare a C++ executable
 add_executable(${PROJECT_NAME}_node src/fast_ndt_slam_node.cpp ${SRC_LIST})
