@@ -71,7 +71,7 @@ namespace LidarSegmentation{
 		int getId();
 		std::string getLabel();
 		Eigen::Matrix3f getEigenVectors();
-		Eigen::Matrix3f getEigenValues();
+		Eigen::Vector3f getEigenValues();
 		bool isValid();
 		void setValidity(bool in_valid);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr joinCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr);

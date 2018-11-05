@@ -4,39 +4,23 @@
 
 #include "../include/fast_ndt_slam/LidarMapping.h"
 namespace FAST_NDT {
-void LidarMapping::setup(ros::NodeHandle handle, ros::NodeHandle privateHandle) {
+void LidarMapping::setup(ros::NodeHandle &handle, ros::NodeHandle &privateHandle) {
 	// initial set.
-	if (!handle.getParam("tf_x", current_pose.x)) {
-		ROS_ERROR("tf_x is not set");
-		exit(1);
-	}
-
-	if (!handle.getParam("tf_y", current_pose.y)) {
-		ROS_ERROR("tf_y is not set");
-		exit(1);
-	}
-
-	if (!handle.getParam("tf_z", current_pose.z)) {
-		ROS_ERROR("tf_z is not set");
-		exit(1);
-	}
-
-	if (!handle.getParam("tf_roll", current_pose.roll)) {
-		ROS_ERROR("tf_roll is not set");
-		exit(1);
-	}
-	if (!handle.getParam("tf_pitch", current_pose.pitch)) {
-		ROS_ERROR("tf_pitch is not set");
-		exit(1);
-	}
-	if (!handle.getParam("tf_yaw", current_pose.yaw)) {
-		ROS_ERROR("tf_yaw is not set");
-		exit(1);
-	}
+	handle.param<double>("tf_x", current_pose.x, 0);
+	handle.param<double>("tf_y", current_pose.y, 0);
+	handle.param<double>("tf_z", current_pose.z, 0);
+	handle.param<double>("tf_roll", current_pose.roll, 0);
+	handle.param<double>("tf_pitch", current_pose.pitch, 0);
+	handle.param<double>("tf_yaw", current_pose.yaw, 0);
+	handle.param<double>("min_add_scan_shift", min_add_scan_shift, 1.0);
+	handle.param<double>("region_move_shift", region_move_shift, 20.0);
+	handle.param<double>("region_x_length", region_x_length, 100.0);
+	handle.param<double>("region_y_length", region_y_length, 100.0);
 
 	ROS_INFO("tf_x, tf_y, tf_z, tf_roll, tf_pitch, tf_yaw (%.4f, %.4f, %.4f, %.4f, %.4f, %.4f)", current_pose.x, current_pose.y, current_pose.z, current_pose.roll, current_pose.pitch, current_pose.yaw);
+	globalMap->pose = current_pose;
+	localMap->pose = current_pose;
 
-	added_pose = current_pose;
 	ndt_map_pub = handle.advertise<sensor_msgs::PointCloud2>("/ndt/map", 10000);
 	current_pose_pub = handle.advertise<geometry_msgs::PoseStamped>("/current_pose", 1000);
 
@@ -45,17 +29,25 @@ void LidarMapping::setup(ros::NodeHandle handle, ros::NodeHandle privateHandle) 
 
 }
 
-void LidarMapping::update_region_map(double max_x, double max_y, double min_x, double min_y) {
-	pcl::ConditionAnd<PointT >::Ptr range_cond(new pcl::ConditionAnd<PointT> ());
-	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::GE, min_x)));
-	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::GE, min_y)));
-	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::LE, max_x)));
-	range_cond->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::LE, max_y)));
-	pcl::ConditionalRemoval<PointT > cond_rem;
-	cond_rem.setCondition(range_cond);
-	cond_rem.setInputCloud(globalMapPtr);
-	cond_rem.setKeepOrganized(true);
-	cond_rem.filter(* regionMapPtr);
+void LidarMapping::update_region_map() {
+	*(globalMap->map_ptr) += *(localMap->map_ptr);
+	double min_x = current_pose.x - region_x_length / 2.0;
+	double max_x = current_pose.x + region_x_length / 2.0;
+	double min_y = current_pose.y - region_y_length / 2.0;
+	double max_y = current_pose.y + region_y_length / 2.0;
+	pcl::PointCloud<PointT >::Ptr localMapPtr(new pcl::PointCloud<PointT>);
+	for (int i = 0; i < globalMap->map_ptr->points.size(); ++i) {
+		PointT& p = globalMap->map_ptr->points[i];
+		if (p.x >= min_x && p.x <= max_x && p.y >= min_y && p.y <= max_y) {
+			localMapPtr->points.push_back(p);
+		}
+	}
+	// filter
+	pcl::VoxelGrid<PointT> voxel_grid_filter;
+	voxel_grid_filter.setLeafSize(voxel_leaf_size, voxel_leaf_size, voxel_leaf_size);
+	voxel_grid_filter.setInputCloud(localMapPtr);
+	voxel_grid_filter.filter(*localMap->map_ptr);
+	localMap->pose = current_pose;
 }
 
 void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &input_cloud) {
@@ -77,9 +69,10 @@ void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &inp
 	// initial map
 	if (!map_initialed) {
 		pcl::transformPointCloud(scan, *transformed_scan_ptr, current_pose.rotateRPY());
-		*globalMapPtr += scan;
-		ndt.setInputTarget(globalMapPtr);
+		*(localMap->map_ptr) += scan;
+		ndt.setInputTarget(localMap->map_ptr);
 		map_initialed = true;
+		added_pose = localMap->pose;
 		return;
 	}
 	// filter
@@ -129,21 +122,28 @@ void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &inp
 	_current_pose.y = _ty;
 	_current_pose.z = _tz;
 	mat_l.getRPY(_current_pose.roll, _current_pose.pitch, _current_pose.yaw);
-
-	double shift = sqrt(pow(current_pose.x - _tx, 2.0) + pow(current_pose.y - _ty, 2.0));
+	// add cloud to local map.
+	double shift = sqrt(pow(_tx - added_pose.x, 2.0) + pow(_ty - added_pose.y, 2.0));
 	if (shift >= min_add_scan_shift) { // update the map
-		*globalMapPtr += *transformed_scan_ptr;
+		*(localMap->map_ptr) += *transformed_scan_ptr;
+		ndt.setInputTarget(localMap->map_ptr);
 		added_pose = _current_pose;
-		ndt.setInputTarget(globalMapPtr);
 	}
 	previous_pose = current_pose;
 	current_pose = _current_pose;
+
+	//extract sub-map from global map.
+	shift = sqrt(pow(current_pose.x - localMap->pose.x, 2.0) + pow(current_pose.y - localMap->pose.y, 2.0));
+	if (shift >= region_move_shift) {
+		update_region_map();
+	}
+
 	ROS_INFO("sequence_number: %d", input_cloud->header.seq);
 	ROS_INFO("used %.4f ms", (t2 - t1) / 1000000.);
 	ROS_INFO("Number of Scan Points: %u", scan.size());
 	ROS_INFO("Number of filtered scan points: %u", filtered_scan_ptr->size());
 	ROS_INFO("transformed_scan_ptr: %u", transformed_scan_ptr->size());
-	ROS_INFO("map: %u", globalMapPtr->size() );
+	ROS_INFO("local map: %u", localMap->map_ptr->points.size());
 	ROS_INFO("NDT has converged %u", has_converged);
 	ROS_INFO("Fitness score: %u", fitness_score);
 	ROS_INFO("Number of Iterations %d", final_num_iteration);
@@ -159,6 +159,16 @@ void LidarMapping::points_callback(const sensor_msgs::PointCloud2::ConstPtr &inp
 	pose.pose.orientation.y = q.y();
 	pose.pose.orientation.z = q.z();
 	pose.pose.orientation.w = q.w();
+	pose.header.frame_id="map";
 	current_pose_pub.publish(pose);
+	pubCounter -= 1;
+	if (pubCounter == 0) {
+		pubCounter = 10;
+		ROS_INFO("output map_msg_ptr");
+		sensor_msgs::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::PointCloud2);
+		pcl::toROSMsg(*(localMap->map_ptr), *map_msg_ptr);
+		map_msg_ptr->header.frame_id = "map";
+		ndt_map_pub.publish(*map_msg_ptr);
+	}
 }
 }

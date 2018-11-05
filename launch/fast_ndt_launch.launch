@@ -14,6 +14,6 @@
     <param name="tf_yaw" value="$(arg init_yaw)"/>
 
     <node pkg="fast_ndt_slam" type="fast_ndt_slam_node" name="fast_ndt_slam_node" output="screen">
-        <remap from="lidar" to="/lidar_0" />
+        <remap from="lidar" to="PointCloud2" />
     </node>
 </launch>

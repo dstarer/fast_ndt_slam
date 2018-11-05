@@ -116,7 +116,7 @@ namespace LidarSegmentation{
 		return this->eigen_vectors_;
 	}
 
-	Eigen::Matrix3f Cluster::getEigenValues() {
+	Eigen::Vector3f Cluster::getEigenValues() {
 		return this->eigen_values_;
 	}
 

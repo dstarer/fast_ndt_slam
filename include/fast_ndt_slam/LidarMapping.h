@@ -48,14 +48,24 @@ namespace FAST_NDT {
         	return mat;
         }
     };
+		struct LidarMap {
+			typedef boost::shared_ptr<LidarMap> Ptr;
+			Pose pose;
+			pcl::PointCloud<PointT>::Ptr map_ptr;
+			LidarMap():map_ptr(new pcl::PointCloud<PointT>) {
+				pose.init();
+			}
+		};
+
+
     class LidarMapping {
     public:
-        LidarMapping(): globalMapPtr(new pcl::PointCloud<PointT>()) {
+        LidarMapping(): globalMap(new LidarMap()), localMap(new LidarMap()){
             maxIter = 30;
             ndt_res = 1.0;
             step_size = 0.1;
             trans_eps = 0.01;
-            voxel_leaf_size = 2.0;
+            voxel_leaf_size = 0.1;
 
             min_add_scan_shift = 1;
             min_scan_range = 5.0;
@@ -65,9 +75,11 @@ namespace FAST_NDT {
             previous_pose.init();
             guess_pose.init();
             current_pose.init();
+            added_pose.init();
+            pubCounter = 10;
         }
 
-        void setup(ros::NodeHandle handle, ros::NodeHandle privateHandle);
+        void setup(ros::NodeHandle &handle, ros::NodeHandle &privateHandle);
 
         void points_callback(const sensor_msgs::PointCloud2::ConstPtr &input_cloud);
 
@@ -75,10 +87,11 @@ namespace FAST_NDT {
     		/**
     		 * select region map in [min_x, min_y, max_x, max_y]
     		 * **/
-    		void update_region_map(double max_x, double max_y, double min_x, double min_y);
+    		void update_region_map();
+
     private:
-        pcl::PointCloud<PointT>::Ptr globalMapPtr;
-        pcl::PointCloud<PointT>::Ptr regionMapPtr;
+    	  LidarMap::Ptr globalMap;
+    	  LidarMap::Ptr localMap;
 #ifdef CUDA_FOUND
         gpu::GNormalDistributionsTransform anh_gpu_ndt;
 #endif
@@ -87,6 +100,7 @@ namespace FAST_NDT {
         Pose guess_pose;
         Pose current_pose;
         Pose added_pose;
+
         int maxIter;
         float ndt_res;
         double step_size;
@@ -94,10 +108,15 @@ namespace FAST_NDT {
         double voxel_leaf_size;
 
         double min_add_scan_shift;
+        double region_move_shift;
         double min_scan_range;
         double max_scan_range;
         bool map_initialed;
 
+        double region_x_length;
+        double region_y_length;
+
+				int pubCounter;
         // publisher
         ros::Publisher current_pose_pub;
         ros::Publisher ndt_map_pub;
