@@ -95,7 +95,7 @@ namespace FAST_NDT {
 #ifdef CUDA_FOUND
         gpu::GNormalDistributionsTransform anh_gpu_ndt;
 #endif
-        pcl::NormalDistributionsTransform<PointT, PointT> ndt;
+        cpu::NormalDistributionsTransform<PointT, PointT> ndt;
         Pose previous_pose;
         Pose guess_pose;
         Pose current_pose;

@@ -127,4 +127,5 @@ add_executable(ScanLineRun src/cluster_node.cpp src/ScanLineRun.cpp include/dete
 		 ${PCL_LIBARRIES}
  )
 
-target_link_libraries(ScanLineRun ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+target_link_libraries(ScanLineRun ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
